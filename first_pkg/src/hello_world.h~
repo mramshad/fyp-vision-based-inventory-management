@@ -1,0 +1,6 @@
+#ifndef HELLO_WORLD_H_
+#define HELLO_WORLD_H_
+ 
+void robot(int argc, char** argv); // function prototype for add.h
+ 
+#endif

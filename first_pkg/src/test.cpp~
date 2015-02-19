@@ -1,0 +1,6 @@
+#include<iostream>
+#include "test.h"
+
+void test(int num){
+  cout << "Test" << num << endl;
+}
