@@ -347,7 +347,6 @@ void loop(){
     set_motors(-30,-30);
   }
   else{
-    sent=false;
     if(!sent){
       fb="td";
       feedback.data=fb;
