@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+
+<script type="text/javascript" src="eventemitter2.min.js"></script>
+<script type="text/javascript" src="roslib.min.js"></script>
+
+<script type="text/javascript" type="text/javascript">
+  // Connecting to ROS
+  // -----------------
+
+  var ros = new ROSLIB.Ros({
+    url : 'ws://fyp-desktop:9090'
+  });
+
+  ros.on('connection', function() {
+    console.log('Connected to websocket server.');
+  });
+
+  ros.on('error', function(error) {
+    console.log('Error connecting to websocket server: ', error);
+  });
+
+  ros.on('close', function() {
+    console.log('Connection to websocket server closed.');
+  });
+
+  // Publishing a Topic
+  // ------------------
+
+  var cmdVel = new ROSLIB.Topic({
+    ros : ros,
+    name : '/user_cmnds',
+    messageType : 'std_msgs/String'
+  });
+  
+
+  // Subscribing to a Topic
+  // ----------------------
+
+  var listener = new ROSLIB.Topic({
+    ros : ros,
+    name : '/response',
+    messageType : 'std_msgs/String'
+  });
+  
+  listener.subscribe(function(message) {
+      document.getElementById("demo").innerHTML = message.data;
+      //listener.unsubscribe();
+  });
+  //var msg =new ROSLIB.Message({data: "run"});
+ // cmdVel.publish(msg);
+/* 
+  var twist = new ROSLIB.Message({
+    linear : {
+      x : 0.1,
+      y : 0.2,
+      z : 0.3
+    },
+    angular : {
+      x : -0.1,
+      y : -0.2,
+      z : -0.3
+    }
+  });
+  var 
+  cmdVel.publish(twist);
+
+  // Subscribing to a Topic
+  // ----------------------
+
+  var listener = new ROSLIB.Topic({
+    ros : ros,
+    name : '/listener',
+    messageType : 'std_msgs/String'
+  });
+
+  listener.subscribe(function(message) {
+    console.log('Received message on ' + listener.name + ': ' + message.data);
+    listener.unsubscribe();
+  });
+
+  // Calling a service
+  // -----------------
+
+  var addTwoIntsClient = new ROSLIB.Service({
+    ros : ros,
+    name : '/add_two_ints',
+    serviceType : 'rospy_tutorials/AddTwoInts'
+  });
+
+  var request = new ROSLIB.ServiceRequest({
+    a : 1,
+    b : 2
+  });
+
+  addTwoIntsClient.callService(request, function(result) {
+    console.log('Result for service call on '
+      + addTwoIntsClient.name
+      + ': '
+      + result.sum);
+  });
+
+  // Getting and setting a param value
+  // ---------------------------------
+
+  ros.getParams(function(params) {
+    console.log(params);
+  });
+
+  var maxVelX = new ROSLIB.Param({
+    ros : ros,
+    name : 'max_vel_y'
+  });
+
+  maxVelX.set(0.8);
+  maxVelX.get(function(value) {
+    console.log('MAX VAL: ' + value);
+  });*/
+
+  function send(command) {
+      if (command== 'run'){
+       var msg =new ROSLIB.Message({data: "run"});
+       cmdVel.publish(msg);}
+
+      else if (command== 'stop'){
+       var msg =new ROSLIB.Message({data: "stop"});
+       cmdVel.publish(msg);}
+
+      else if (command== 'go'){
+       var msg =new ROSLIB.Message({data: "go"});
+       cmdVel.publish(msg);}
+     
+      else if (command== 'back'){
+       var msg =new ROSLIB.Message({data: "back"});
+       cmdVel.publish(msg);}
+
+      else if (command== 'right'){
+       var msg =new ROSLIB.Message({data: "right"});
+       cmdVel.publish(msg);}
+ 
+     else if (command== 'left'){
+       var msg =new ROSLIB.Message({data: "left"});
+       cmdVel.publish(msg);}
+  }
+</script>
+</head>
+
+<body>
+  <h1>Simple roslib Example</h1>
+  <p>Check your Web Console for output.</p>
+ 
+  <button type="button" onclick="send('run')">RUN</button>
+  
+  <button type="button" onclick="send('stop')">STOP</button>
+ 
+  <button type="button" onclick="send('go')">Forwrad</button>
+ 
+  <button type="button" onclick="send('back')">Backward</button>
+
+  <button type="button" onclick="send('right')">Right</button>
+
+  <button type="button" onclick="send('left')">Left</button>
+
+  <p id="demo"></p>
+
+</body>
+</html>
