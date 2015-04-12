@@ -2,7 +2,7 @@
 #include<std_msgs/String.h>
 #include <unistd.h>
 
-ros::Publisher panda_pub_ard, panda_pub_usr;
+ros::Publisher panda_pub_ard, panda_pub_pan, panda_pub_usr;
 ros::Subscriber panda_sub_ard, panda_sub_usr;
 bool ard_ready=true;
 
@@ -29,6 +29,23 @@ void user_cmndsCb(const std_msgs::String::ConstPtr& msg){
       panda_pub_usr.publish(command);
       ROS_INFO("Publishing to user %s", command.data.c_str());
     }
+  }
+  else if(msg->data == "cam-on"){
+      system("roslaunch usb_cam_launch");
+  }
+  else if(msg->data == "cam-off"){
+      system();
+  }
+  else if(msg->data == "off"){
+      system("shutdown -h now");
+  }
+  else if(msg->data == "pl"){
+    panda_pub_pan.publish(command);
+    ROS_INFO("Publishing to arduino %s", msg->data.c_str());
+  }
+  else if(msg->data == "pr"){
+    panda_pub_pan.publish(command);
+    ROS_INFO("Publishing to arduino %s", msg->data.c_str());
   }
   else{
     command.data="Invalid Command";
@@ -80,6 +97,7 @@ int main(int argc, char** argv){
   std_msgs::String msg;
 
   panda_pub_ard = nh.advertise<std_msgs::String>("toggle_led", 10 , true);
+  panda_pub_pan = nh.advertise<std_msgs::String>("pan", 10 , true);
   panda_pub_usr = nh.advertise<std_msgs::String>("response", 10 , true);
   panda_sub_usr = nh.subscribe("user_cmnds", 1000, user_cmndsCb);
   panda_sub_ard = nh.subscribe("feedback", 1000, feedbackCb);

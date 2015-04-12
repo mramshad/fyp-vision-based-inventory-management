@@ -1,5 +1,4 @@
 /* ROS Serial Subscriber */
-
 #include <ros.h>
 #include <std_msgs/String.h>
 #include <QTRSensors.h>
@@ -11,7 +10,6 @@
 #define NUM_SENSORS             6  // number of sensors used
 #define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
 //#define EMITTER_PIN             2  // emitter is controlled by digital pin 2
-#define NUM_OF_STRIPES 3
 
 // sensors 0 through 5 are connected to analog inputs 0 through 5, respectively
 QTRSensorsAnalog qtra((unsigned char[]) {0, 1, 2, 3, 4, 5}, 
@@ -35,7 +33,7 @@ int integral;
 int proportional;
 int derivative;
 int power_difference;
-const int max = 80;
+const int max = 60;
 
 char state, pan;
 unsigned int counter; // usado como um simples contador
@@ -334,7 +332,7 @@ void loop(){
   else if(state=='o')
   {
     sent=false;
-    set_motors(60,60);
+    set_motors(80,80);
     /*digitalWrite(13,HIGH);
     delay(500);
     digitalWrite(13,LOW);
@@ -344,7 +342,7 @@ void loop(){
   else if(state=='a')
   {
     sent=false;
-    set_motors(-40,-40);
+    set_motors(-50,-50);
   }
   else if(state=='t'){
     sent=false;
@@ -359,7 +357,28 @@ void loop(){
     pass=0;
     //digitalWrite(13,LOW);
   }
-    
+  
+  if (pan=='l'){
+    if(pos<180){
+      pos = pos + 10;
+    }
+    else {
+      pos = 180;
+    }
+    myservo.write(pos);
+    pan='t';
+  }
+  else if(pan=='r'){
+    if(pos>0){
+      pos = pos -10;
+    }
+    else {
+      pos = 0;
+    }
+    myservo.write(pos);
+    pan='t';
+  }
+  
   nh.spinOnce();
   delay(1);
 }

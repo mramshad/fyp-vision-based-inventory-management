@@ -1,71 +1,80 @@
 /* ROS Serial Subscriber */
-
 #include <ros.h>
 #include <std_msgs/String.h>
 #include <QTRSensors.h>
 #include <Wire.h>
 #include <Servo.h> 
-
-#define NUMREADINGS 10 
-
+#include <std_msgs/Int8.h>
 #define NUM_SENSORS             6  // number of sensors used
 #define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
 //#define EMITTER_PIN             2  // emitter is controlled by digital pin 2
-#define NUM_OF_STRIPES 3
 
 // sensors 0 through 5 are connected to analog inputs 0 through 5, respectively
-QTRSensorsAnalog qtra((unsigned char[]) {0, 1, 2, 3, 4, 5}, 
-  NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, QTR_NO_EMITTER_PIN);
+QTRSensorsAnalog qtra((unsigned char[]) {0, 1, 2, 3, 4, 5},NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, QTR_NO_EMITTER_PIN);
 
 Servo myservo;  // create servo object to control a servo 
 
 
-// Definição de variáveis
+// Define variable for sensor readings
 unsigned int sensors[6]; // Matriz para armazenar valores dos sensores
 
-int Right = 5; // Pinagem para a PONTE-H
+//define the pins for pwm control
+int Right = 5; 
 int RightD= 4;
 int Left = 3;
 int LeftD = 2;
-int pos = 90;
+int pos = 90; //default postion of pan servo
 
 unsigned int position;
-int last_proportional;
-int integral;
-int proportional;
-int derivative;
-int power_difference;
-const int max = 80;
+int last_proportional;  // last propprtonal error
+int integral;           // integration of previous errors
+int proportional;       // present error
+int derivative;         // error rate
+int power_difference;   // required power difference for error correction
+int blob_dist;
+const int max = 80;     // maximum pwm speed of motors
 
-char state, pan;
-unsigned int counter; // usado como um simples contador
-unsigned int once=0; 
-unsigned int stripes=0;
-unsigned int pass;
-boolean sent=true;
+
+char state,curr_state, pan;       //variables that decode user commands
+unsigned int counter;             //variable used to run loops (free-runs)
+unsigned int once=0;              // parameter used for one time calibration purpose
+unsigned int stripes=0;           //variable to count the number of stripes
+//unsigned int pass;
+boolean sent=true;     //variable to confirm that feedback is sent to main control board(pandaboard)
 char *fb;
 
+unsigned long time;    //variable to measure processing times
+char res[50];          //character buffer to convert int and string to constant char *
 
+//ros node creation
 ros::NodeHandle nh;
 
+//Callback function for motor control commands
 void messageCb (const std_msgs::String& toggle_msg){
-  
-  state = toggle_msg.data[1];
-  /*digitalWrite(13,HIGH);
-  delay(500);
-  digitalWrite(13,LOW);*/
-    
+  state = toggle_msg.data[1];  
 }
+
+//Callback function for pan-servo control commands
 void messageCbPan(const std_msgs::String& pan_msg){  
   pan = pan_msg.data[1];
 }
 
+//Callback function for topic blob_dist to receive blob distance
+void messageCbBlob(const std_msgs::Int8& blob_msg){  
+  blob_dist = blob_msg.data;
+}
+
+//ros subscribers for usercommands for motor control and pan control
 ros::Subscriber<std_msgs::String> sub("toggle_led", &messageCb);
 ros::Subscriber<std_msgs::String> subPan("pan", &messageCbPan);
+ros::Subscriber<std_msgs::Int8> subBlob("blob_dist", &messageCbBlob);
 
-std_msgs::String feedback;
+//Strings to send feedback msgs and logs to the control board(pandaboard)
+std_msgs::String feedback,logs;
 
+//ros Publishers to send feedback and log info
 ros::Publisher pub("feedback",&feedback);
+ros::Publisher pub_logs("logs",&logs);
 
 
 // Acionamento dos motores
@@ -100,6 +109,7 @@ void set_motors(int left_speed, int right_speed){
   } 
 }
 
+//turn the robot to 90 degrees right
 void turn_right_90(){
   int i;
   for(i=0;i<30000;i++){
@@ -107,6 +117,7 @@ void turn_right_90(){
   }
 }
 
+//turn the robot to 90 degrees left
 void turn_left_90(){
   int i;
   for(i=0;i<30000;i++){
@@ -114,6 +125,7 @@ void turn_left_90(){
   }
 }
 
+//turn robot by 180 degrees
 void turn_180(){
   for(int i=0;i<30000;i++){
     set_motors(155, -155);
@@ -123,8 +135,9 @@ void turn_180(){
   }
 }
 
+//line following 
 void follow_line(){
-  position = qtra.readLine(sensors,QTR_EMITTERS_ON,true);
+    position = qtra.readLine(sensors,QTR_EMITTERS_ON,true);
     
     //Serial.begin(9600);
      // 1000 means minimum reflectance, followed by the line position
@@ -177,7 +190,9 @@ void setup(){
   nh.initNode();
   nh.subscribe(sub);
   nh.subscribe(subPan);
+  nh.subscribe(subBlob);
   nh.advertise(pub);
+  nh.advertise(pub_logs);
   
   pinMode(4,OUTPUT);
   pinMode(2,OUTPUT);
@@ -189,17 +204,14 @@ void setup(){
 }
 
 void loop(){
-  
+   //time=millis();
+   
    if(state=='u')
    { 
+     curr_state=state;
      sent=false;
      if(once<1){
        set_motors(0,0); // Enquanto espera, motores permanecem parados
-  
-  
-     //Serial.println("Auto-calibracao");
-     // Auto-calibração: gira para a direita e depois esquerda e volta ao início
-     // calibrando os sensores
  
      for(counter=0; counter<80; counter++){
        if(counter < 20 || counter >= 60){
@@ -219,9 +231,9 @@ void loop(){
                    // de calibração
      once++;
    }
-  
+   
+   //skip the first stripe ie. starting position  
    if(stripes==0){
-    
      follow_line(); 
      if(sensors[0]<100 && sensors[5]<100){
        stripes++;
@@ -281,19 +293,26 @@ void loop(){
      }*/   
      
    }
+//   sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//   logs.data=res;
+//   pub_logs.publish(&logs);
   }
   
   else if(state=='m'){
+    curr_state=state;
     sent=false;
     fb="md";
     feedback.data=fb;
     follow_line();
     if(sensors[2]>500 && sensors[3]>500){
       for(int i=0; i<25000;i++){
-        set_motors(180,180);
+        set_motors(70,70);
       }
       for(int i=0; i<25000;i++){
         set_motors(50,50);
+      }
+      for(int i=0; i<25000;i++){
+        set_motors(30,30);
       }
       for(int i=0; i<5000;i++){
         set_motors(0,0);
@@ -303,10 +322,14 @@ void loop(){
       sent=true; 
       state='t';
     }
+//    sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//    logs.data=res;
+//    pub_logs.publish(&logs);
   } 
   
   else if(state=='i') 
   { 
+    curr_state=state;
     sent=false;
     //fb="id";
     //feedback.data=fb;
@@ -318,10 +341,14 @@ void loop(){
     //pub.publish(&feedback);
     //sent=true;
     state='t';
+//    sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//    logs.data=res;
+//    pub_logs.publish(&logs);
   }
   
   else if(state=='e') 
   {
+    curr_state=state;
     sent=false;
     //feedback.data="left_done"; 
     for(counter=0;counter<50;counter++){
@@ -329,37 +356,72 @@ void loop(){
       delay(10);
     }
     state='t';
+//    sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//    logs.data=res;
+//    pub_logs.publish(&logs);
   }
   
   else if(state=='o')
   {
+    curr_state=state;
     sent=false;
-    set_motors(60,60);
+    set_motors(80,80);
     /*digitalWrite(13,HIGH);
     delay(500);
     digitalWrite(13,LOW);
     delay(500);*/
+//    sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//    logs.data=res;
+//    pub_logs.publish(&logs);
   }
   
   else if(state=='a')
   {
+    curr_state=state;
     sent=false;
-    set_motors(-40,-40);
+    set_motors(-50,-50);
+//    sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//    logs.data=res;
+//    pub_logs.publish(&logs);
   }
   else if(state=='t'){
+    curr_state=state;
     sent=false;
     if(!sent){
       fb="td";
       feedback.data=fb;
       pub.publish(&feedback);
-      sent=true;
+      sent=true; 
       state='z';
     }
     set_motors(0,0);
-    pass=0;
-    //digitalWrite(13,LOW);
+    //pass=0;
+//    sprintf(res,"state:%c time:%lu s1:%d s2:%d s3:%d s4:%d s5:%d s6:%d", curr_state, time, sensors[0],sensors[1],sensors[2],sensors[3],sensors[4],sensors[5]);
+//    logs.data=res;
+//    pub_logs.publish(&logs);
   }
-    
+  
+  if (pan=='l'){
+    if(pos<180){
+      pos = pos + 10;
+    }
+    else {
+      pos = 180;
+    }
+    myservo.write(pos);
+    pan='t';
+  }
+  else if(pan=='r'){
+    if(pos>0){
+      pos = pos -10;
+    }
+    else {
+      pos = 0;
+    }
+    myservo.write(pos);
+    pan='t';
+  }
+  
   nh.spinOnce();
   delay(1);
 }
